@@ -13,46 +13,50 @@ class AlignDialog(wx.Dialog):
         super().__init__(self.parent_frame, title="Align Tools", style=wx.DEFAULT_DIALOG_STYLE)
 
         # --- Sizers ---
-        # A sizer is used to lay out the widgets in the dialog
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         button_sizer = wx.StdDialogButtonSizer()
 
         # --- Widgets ---
-        # A simple text label
-        info_text = wx.StaticText(self, label="Select an alignment option:")
+        info_text = wx.StaticText(self, label="Choose label type and alignment options:")
 
-        # Our main "Align" button
-        self.align_button = wx.Button(self, label="Align")
-        # Align Values button
-        self.align_values_button = wx.Button(self, label="Align Values")
+        # Buttons (label names shown in UI)
+        self.align_button = wx.Button(self, label="References")
+        self.align_values_button = wx.Button(self, label="Values")
+
         # Alignment mode selector
         self.alignment_modes = ["Left", "Center", "Right"]
-        self.alignment_selector = wx.RadioBox(self, label="Horizontal Alignment", choices=self.alignment_modes,
+        self.alignment_selector = wx.RadioBox(self, label="Horizontal Alignment",
+                                              choices=self.alignment_modes,
                                               majorDimension=1, style=wx.RA_SPECIFY_ROWS)
+
+        # Position mode selector (Absolute or Relative)
+        self.position_modes = ["Absolute", "Relative"]
+        self.position_selector = wx.RadioBox(self, label="Position Mode",
+                                             choices=self.position_modes,
+                                             majorDimension=1, style=wx.RA_SPECIFY_ROWS)
 
         # Standard OK and Cancel buttons
         ok_button = wx.Button(self, wx.ID_OK)
         cancel_button = wx.Button(self, wx.ID_CANCEL)
 
         # --- Layout ---
-        # Add widgets to the sizers with padding
         main_sizer.Add(info_text, 0, wx.ALL, 10)
         main_sizer.Add(self.align_button, 0, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(self.align_values_button, 0, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(self.alignment_selector, 0, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10) # A separator line
-        
+        main_sizer.Add(self.position_selector, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
         button_sizer.AddButton(ok_button)
         button_sizer.AddButton(cancel_button)
-        button_sizer.Realize() # This prepares the button sizer
+        button_sizer.Realize()
 
         main_sizer.Add(button_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
-        # Set the main sizer for the dialog and fit its contents
+        # Finalize
         self.SetSizerAndFit(main_sizer)
 
         # --- Bind Events ---
-        # Connect the button click to a function
         self.align_button.Bind(wx.EVT_BUTTON, self.on_align)
         self.align_values_button.Bind(wx.EVT_BUTTON, self.on_align_values)
 
@@ -97,6 +101,15 @@ class AlignDialog(wx.Dialog):
         anchor_ref_left_x = anchor_ref_center_x - (anchor_ref_bbox.GetWidth() / 2)
         anchor_ref_right_x = anchor_ref_center_x + (anchor_ref_bbox.GetWidth() / 2)
 
+        # Position mode: Absolute or Relative
+        pos_mode = self.position_selector.GetString(self.position_selector.GetSelection())
+        if pos_mode == "Relative":
+            # Compute anchor offset from its footprint center
+            anchor_fp_center_x = anchor_fp.GetPosition().x
+            anchor_fp_center_y = anchor_fp.GetPosition().y
+            anchor_offset_x = anchor_ref_center_x - anchor_fp_center_x
+            anchor_offset_y = anchor_ref_pos.y - anchor_fp_center_y
+
         # Move other references
         moved = 0
         for fp in footprints_to_align:
@@ -104,19 +117,26 @@ class AlignDialog(wx.Dialog):
             if not ref_to_move:
                 continue  # Skip if footprint has no reference
 
-            # Horizontal: compute X based on selected alignment mode
-            ref_bbox = ref_to_move.GetBoundingBox()
-            mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
-            if mode == "Left":
-                new_x = anchor_ref_left_x + (ref_bbox.GetWidth() / 2)
-            elif mode == "Center":
-                # align centers
-                new_x = anchor_ref_center_x
-            else:  # Right
-                new_x = anchor_ref_right_x - (ref_bbox.GetWidth() / 2)
+            if pos_mode == "Relative":
+                # Place the label center at footprint center + anchor offset
+                fp_center_x = fp.GetPosition().x
+                fp_center_y = fp.GetPosition().y
+                new_x = fp_center_x + anchor_offset_x
+                new_y = fp_center_y + anchor_offset_y
+            else:
+                # Horizontal: compute X based on selected alignment mode
+                ref_bbox = ref_to_move.GetBoundingBox()
+                mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
+                if mode == "Left":
+                    new_x = anchor_ref_left_x + (ref_bbox.GetWidth() / 2)
+                elif mode == "Center":
+                    # align centers
+                    new_x = anchor_ref_center_x
+                else:  # Right
+                    new_x = anchor_ref_right_x - (ref_bbox.GetWidth() / 2)
 
-            # Vertical: use the footprint's position Y coordinate as its center
-            new_y = fp.GetPosition().y
+                # Vertical: use the footprint's position Y coordinate as its center
+                new_y = fp.GetPosition().y
 
             ref_to_move.SetPosition(pcbnew.VECTOR2I(int(new_x), int(new_y)))
             moved += 1
@@ -162,6 +182,14 @@ class AlignDialog(wx.Dialog):
         anchor_val_left_x = anchor_val_center_x - (anchor_val_bbox.GetWidth() / 2)
         anchor_val_right_x = anchor_val_center_x + (anchor_val_bbox.GetWidth() / 2)
 
+        # Position mode
+        pos_mode_val = self.position_selector.GetString(self.position_selector.GetSelection())
+        if pos_mode_val == "Relative":
+            anchor_fp_center_x = anchor_fp.GetPosition().x
+            anchor_fp_center_y = anchor_fp.GetPosition().y
+            anchor_offset_x = anchor_val_center_x - anchor_fp_center_x
+            anchor_offset_y = anchor_val_pos.y - anchor_fp_center_y
+
         # Move other values
         moved = 0
         for fp in footprints_to_align:
@@ -169,18 +197,24 @@ class AlignDialog(wx.Dialog):
             if not val_to_move:
                 continue  # Skip if footprint has no value
 
-            # Horizontal: compute X based on selected alignment mode
-            val_bbox = val_to_move.GetBoundingBox()
-            mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
-            if mode == "Left":
-                new_x = anchor_val_left_x + (val_bbox.GetWidth() / 2)
-            elif mode == "Center":
-                new_x = anchor_val_center_x
-            else:  # Right
-                new_x = anchor_val_right_x - (val_bbox.GetWidth() / 2)
+            if pos_mode_val == "Relative":
+                fp_center_x = fp.GetPosition().x
+                fp_center_y = fp.GetPosition().y
+                new_x = fp_center_x + anchor_offset_x
+                new_y = fp_center_y + anchor_offset_y
+            else:
+                # Horizontal: compute X based on selected alignment mode
+                val_bbox = val_to_move.GetBoundingBox()
+                mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
+                if mode == "Left":
+                    new_x = anchor_val_left_x + (val_bbox.GetWidth() / 2)
+                elif mode == "Center":
+                    new_x = anchor_val_center_x
+                else:  # Right
+                    new_x = anchor_val_right_x - (val_bbox.GetWidth() / 2)
 
-            # Vertical: use the footprint's position Y coordinate as its center
-            new_y = fp.GetPosition().y
+                # Vertical: use the footprint's position Y coordinate as its center
+                new_y = fp.GetPosition().y
 
             val_to_move.SetPosition(pcbnew.VECTOR2I(int(new_x), int(new_y)))
             moved += 1
