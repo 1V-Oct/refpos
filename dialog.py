@@ -75,7 +75,10 @@ class AlignDialog(wx.Dialog):
             return
 
         # Let the user explicitly choose which selected footprint will be the anchor.
-        choices = [fp.GetReference() or f"<unnamed {i}>" for i, fp in enumerate(selected_footprints)]
+        ref_items = [(fp.GetReference() or f"<unnamed {i}>", fp) for i, fp in enumerate(selected_footprints)]
+        # Sort by reference name (case-insensitive)
+        ref_items.sort(key=lambda t: t[0].upper())
+        choices = [name for name, _ in ref_items]
         choice_dlg = wx.SingleChoiceDialog(self,
                                            "Select the anchor footprint (other selected footprints will align to it):",
                                            "Choose Anchor",
@@ -86,8 +89,8 @@ class AlignDialog(wx.Dialog):
         anchor_index = choice_dlg.GetSelection()
         choice_dlg.Destroy()
 
-        anchor_fp = selected_footprints[anchor_index]
-        footprints_to_align = [fp for i, fp in enumerate(selected_footprints) if i != anchor_index]
+        anchor_fp = ref_items[anchor_index][1]
+        footprints_to_align = [fp for name, fp in ref_items if fp is not anchor_fp]
 
         anchor_ref = anchor_fp.Reference()
         if not anchor_ref:
@@ -174,7 +177,9 @@ class AlignDialog(wx.Dialog):
             return
 
         # Let the user explicitly choose which selected footprint will be the anchor.
-        choices = [fp.GetReference() or f"<unnamed {i}>" for i, fp in enumerate(selected_footprints)]
+        ref_items = [(fp.GetReference() or f"<unnamed {i}>", fp) for i, fp in enumerate(selected_footprints)]
+        ref_items.sort(key=lambda t: t[0].upper())
+        choices = [name for name, _ in ref_items]
         choice_dlg = wx.SingleChoiceDialog(self,
                                            "Select the anchor footprint (other selected footprints will align to it):",
                                            "Choose Anchor",
@@ -185,8 +190,8 @@ class AlignDialog(wx.Dialog):
         anchor_index = choice_dlg.GetSelection()
         choice_dlg.Destroy()
 
-        anchor_fp = selected_footprints[anchor_index]
-        footprints_to_align = [fp for i, fp in enumerate(selected_footprints) if i != anchor_index]
+        anchor_fp = ref_items[anchor_index][1]
+        footprints_to_align = [fp for name, fp in ref_items if fp is not anchor_fp]
 
         anchor_val = anchor_fp.Value()
         if not anchor_val:
