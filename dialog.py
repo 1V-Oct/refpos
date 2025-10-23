@@ -25,6 +25,10 @@ class AlignDialog(wx.Dialog):
         self.align_button = wx.Button(self, label="Align")
         # Align Values button
         self.align_values_button = wx.Button(self, label="Align Values")
+        # Alignment mode selector
+        self.alignment_modes = ["Left", "Center", "Right"]
+        self.alignment_selector = wx.RadioBox(self, label="Horizontal Alignment", choices=self.alignment_modes,
+                                              majorDimension=1, style=wx.RA_SPECIFY_ROWS)
 
         # Standard OK and Cancel buttons
         ok_button = wx.Button(self, wx.ID_OK)
@@ -35,6 +39,7 @@ class AlignDialog(wx.Dialog):
         main_sizer.Add(info_text, 0, wx.ALL, 10)
         main_sizer.Add(self.align_button, 0, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(self.align_values_button, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.alignment_selector, 0, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10) # A separator line
         
         button_sizer.AddButton(ok_button)
@@ -85,10 +90,12 @@ class AlignDialog(wx.Dialog):
             wx.MessageBox(f"Anchor footprint {anchor_fp.GetReference()} has no reference text.", "Error", wx.OK | wx.ICON_ERROR)
             return
 
-        # Calculate anchor left X using its reference position (center) and width
+        # Anchor metrics for horizontal alignment
         anchor_ref_pos = anchor_ref.GetPosition()
         anchor_ref_bbox = anchor_ref.GetBoundingBox()
-        anchor_ref_left_x = anchor_ref_pos.x - (anchor_ref_bbox.GetWidth() / 2)
+        anchor_ref_center_x = anchor_ref_pos.x
+        anchor_ref_left_x = anchor_ref_center_x - (anchor_ref_bbox.GetWidth() / 2)
+        anchor_ref_right_x = anchor_ref_center_x + (anchor_ref_bbox.GetWidth() / 2)
 
         # Move other references
         moved = 0
@@ -97,9 +104,16 @@ class AlignDialog(wx.Dialog):
             if not ref_to_move:
                 continue  # Skip if footprint has no reference
 
-            # Horizontal: align left edge with anchor's left edge
+            # Horizontal: compute X based on selected alignment mode
             ref_bbox = ref_to_move.GetBoundingBox()
-            new_x = anchor_ref_left_x + (ref_bbox.GetWidth() / 2)
+            mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
+            if mode == "Left":
+                new_x = anchor_ref_left_x + (ref_bbox.GetWidth() / 2)
+            elif mode == "Center":
+                # align centers
+                new_x = anchor_ref_center_x
+            else:  # Right
+                new_x = anchor_ref_right_x - (ref_bbox.GetWidth() / 2)
 
             # Vertical: use the footprint's position Y coordinate as its center
             new_y = fp.GetPosition().y
@@ -141,10 +155,12 @@ class AlignDialog(wx.Dialog):
             wx.MessageBox(f"Anchor footprint {anchor_fp.GetReference()} has no value text.", "Error", wx.OK | wx.ICON_ERROR)
             return
 
-        # Calculate anchor left X using its value position (center) and width
+        # Anchor metrics for horizontal alignment (value)
         anchor_val_pos = anchor_val.GetPosition()
         anchor_val_bbox = anchor_val.GetBoundingBox()
-        anchor_val_left_x = anchor_val_pos.x - (anchor_val_bbox.GetWidth() / 2)
+        anchor_val_center_x = anchor_val_pos.x
+        anchor_val_left_x = anchor_val_center_x - (anchor_val_bbox.GetWidth() / 2)
+        anchor_val_right_x = anchor_val_center_x + (anchor_val_bbox.GetWidth() / 2)
 
         # Move other values
         moved = 0
@@ -153,9 +169,15 @@ class AlignDialog(wx.Dialog):
             if not val_to_move:
                 continue  # Skip if footprint has no value
 
-            # Horizontal: align left edge with anchor's left edge
+            # Horizontal: compute X based on selected alignment mode
             val_bbox = val_to_move.GetBoundingBox()
-            new_x = anchor_val_left_x + (val_bbox.GetWidth() / 2)
+            mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
+            if mode == "Left":
+                new_x = anchor_val_left_x + (val_bbox.GetWidth() / 2)
+            elif mode == "Center":
+                new_x = anchor_val_center_x
+            else:  # Right
+                new_x = anchor_val_right_x - (val_bbox.GetWidth() / 2)
 
             # Vertical: use the footprint's position Y coordinate as its center
             new_y = fp.GetPosition().y
