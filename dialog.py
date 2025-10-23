@@ -1,0 +1,167 @@
+# align_plugin/dialog.py
+
+import pcbnew
+import wx
+
+class AlignDialog(wx.Dialog):
+    """
+    The main dialog for the Align Tools plugin.
+    """
+    def __init__(self, parent_frame):
+        self.parent_frame = parent_frame
+        # Initialize the dialog
+        super().__init__(self.parent_frame, title="Align Tools", style=wx.DEFAULT_DIALOG_STYLE)
+
+        # --- Sizers ---
+        # A sizer is used to lay out the widgets in the dialog
+        main_sizer = wx.BoxSizer(wx.VERTICAL)
+        button_sizer = wx.StdDialogButtonSizer()
+
+        # --- Widgets ---
+        # A simple text label
+        info_text = wx.StaticText(self, label="Select an alignment option:")
+
+        # Our main "Align" button
+        self.align_button = wx.Button(self, label="Align")
+        # Align Values button
+        self.align_values_button = wx.Button(self, label="Align Values")
+
+        # Standard OK and Cancel buttons
+        ok_button = wx.Button(self, wx.ID_OK)
+        cancel_button = wx.Button(self, wx.ID_CANCEL)
+
+        # --- Layout ---
+        # Add widgets to the sizers with padding
+        main_sizer.Add(info_text, 0, wx.ALL, 10)
+        main_sizer.Add(self.align_button, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.align_values_button, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(wx.StaticLine(self), 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10) # A separator line
+        
+        button_sizer.AddButton(ok_button)
+        button_sizer.AddButton(cancel_button)
+        button_sizer.Realize() # This prepares the button sizer
+
+        main_sizer.Add(button_sizer, 0, wx.EXPAND | wx.ALL, 10)
+
+        # Set the main sizer for the dialog and fit its contents
+        self.SetSizerAndFit(main_sizer)
+
+        # --- Bind Events ---
+        # Connect the button click to a function
+        self.align_button.Bind(wx.EVT_BUTTON, self.on_align)
+        self.align_values_button.Bind(wx.EVT_BUTTON, self.on_align_values)
+
+    def on_align(self, event):
+        """
+        This function is called when the 'Align' button is clicked.
+        For now, it just shows a message.
+        """
+        board = pcbnew.GetBoard()
+
+        # Collect selected footprints
+        selected_footprints = [fp for fp in board.GetFootprints() if fp.IsSelected()]
+
+        if len(selected_footprints) < 2:
+            wx.MessageBox("Please select at least two footprints to align.", "Not enough footprints", wx.OK | wx.ICON_WARNING)
+            return
+
+        # Let the user explicitly choose which selected footprint will be the anchor.
+        choices = [fp.GetReference() or f"<unnamed {i}>" for i, fp in enumerate(selected_footprints)]
+        choice_dlg = wx.SingleChoiceDialog(self,
+                                           "Select the anchor footprint (other selected footprints will align to it):",
+                                           "Choose Anchor",
+                                           choices)
+        if choice_dlg.ShowModal() != wx.ID_OK:
+            choice_dlg.Destroy()
+            return
+        anchor_index = choice_dlg.GetSelection()
+        choice_dlg.Destroy()
+
+        anchor_fp = selected_footprints[anchor_index]
+        footprints_to_align = [fp for i, fp in enumerate(selected_footprints) if i != anchor_index]
+
+        anchor_ref = anchor_fp.Reference()
+        if not anchor_ref:
+            wx.MessageBox(f"Anchor footprint {anchor_fp.GetReference()} has no reference text.", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        # Calculate anchor left X using its reference position (center) and width
+        anchor_ref_pos = anchor_ref.GetPosition()
+        anchor_ref_bbox = anchor_ref.GetBoundingBox()
+        anchor_ref_left_x = anchor_ref_pos.x - (anchor_ref_bbox.GetWidth() / 2)
+
+        # Move other references
+        moved = 0
+        for fp in footprints_to_align:
+            ref_to_move = fp.Reference()
+            if not ref_to_move:
+                continue  # Skip if footprint has no reference
+
+            # Horizontal: align left edge with anchor's left edge
+            ref_bbox = ref_to_move.GetBoundingBox()
+            new_x = anchor_ref_left_x + (ref_bbox.GetWidth() / 2)
+
+            # Vertical: use the footprint's position Y coordinate as its center
+            new_y = fp.GetPosition().y
+
+            ref_to_move.SetPosition(pcbnew.VECTOR2I(int(new_x), int(new_y)))
+            moved += 1
+
+        wx.MessageBox(f"Aligned {moved} footprint references to {anchor_fp.GetReference()}.", "Alignment Complete", wx.OK | wx.ICON_INFORMATION)
+        self.EndModal(wx.ID_OK)
+
+    def on_align_values(self, event):
+        """Align footprint value labels using the same method as references."""
+        board = pcbnew.GetBoard()
+
+        # Collect selected footprints
+        selected_footprints = [fp for fp in board.GetFootprints() if fp.IsSelected()]
+
+        if len(selected_footprints) < 2:
+            wx.MessageBox("Please select at least two footprints to align.", "Not enough footprints", wx.OK | wx.ICON_WARNING)
+            return
+
+        # Let the user explicitly choose which selected footprint will be the anchor.
+        choices = [fp.GetReference() or f"<unnamed {i}>" for i, fp in enumerate(selected_footprints)]
+        choice_dlg = wx.SingleChoiceDialog(self,
+                                           "Select the anchor footprint (other selected footprints will align to it):",
+                                           "Choose Anchor",
+                                           choices)
+        if choice_dlg.ShowModal() != wx.ID_OK:
+            choice_dlg.Destroy()
+            return
+        anchor_index = choice_dlg.GetSelection()
+        choice_dlg.Destroy()
+
+        anchor_fp = selected_footprints[anchor_index]
+        footprints_to_align = [fp for i, fp in enumerate(selected_footprints) if i != anchor_index]
+
+        anchor_val = anchor_fp.Value()
+        if not anchor_val:
+            wx.MessageBox(f"Anchor footprint {anchor_fp.GetReference()} has no value text.", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        # Calculate anchor left X using its value position (center) and width
+        anchor_val_pos = anchor_val.GetPosition()
+        anchor_val_bbox = anchor_val.GetBoundingBox()
+        anchor_val_left_x = anchor_val_pos.x - (anchor_val_bbox.GetWidth() / 2)
+
+        # Move other values
+        moved = 0
+        for fp in footprints_to_align:
+            val_to_move = fp.Value()
+            if not val_to_move:
+                continue  # Skip if footprint has no value
+
+            # Horizontal: align left edge with anchor's left edge
+            val_bbox = val_to_move.GetBoundingBox()
+            new_x = anchor_val_left_x + (val_bbox.GetWidth() / 2)
+
+            # Vertical: use the footprint's position Y coordinate as its center
+            new_y = fp.GetPosition().y
+
+            val_to_move.SetPosition(pcbnew.VECTOR2I(int(new_x), int(new_y)))
+            moved += 1
+
+        wx.MessageBox(f"Aligned {moved} footprint values to {anchor_fp.GetReference()}.", "Alignment Complete", wx.OK | wx.ICON_INFORMATION)
+        self.EndModal(wx.ID_OK)
