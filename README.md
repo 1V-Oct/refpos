@@ -21,6 +21,25 @@ Features
  - Choose position mode: Absolute (align to anchor's absolute label position) or Relative (apply anchor's offset from its footprint center to other footprints).
 - Simple, fast, undoable changes inside KiCad.
 
+Vertical (rotated) labels
+-------------------------
+- The plugin now supports anchors that are rotated 90° (vertical labels). When an anchor label is detected as vertical the alignment logic is applied as if everything were rotated 90°:
+   - The label's long axis becomes the alignment axis. Left/Center/Right map to Top/Center/Bottom for the rotated case.
+   - In Absolute mode the plugin aligns other labels' Y positions to the anchor's top/center/bottom (and uses each footprint's X center for the cross axis).
+   - In Relative mode the anchor's offsets are computed relative to its footprint center and applied to other footprints with edge-aware adjustments (using text height for vertical alignment).
+
+Detection heuristic
+-------------------
+- The plugin detects a vertical label by comparing the label's bounding-box height and width. If height > width the label is treated as vertical. This avoids relying on KiCad API angle properties and works reliably for typical footprint labels.
+
+Testing and tips for vertical anchors
+-----------------------------------
+1. Make an anchor label vertical (rotate its Reference or Value 90°) in the footprint properties.
+2. Select multiple footprints and run the plugin (References or Values). Choose Absolute or Relative and pick the vertical anchor.
+3. Left → maps to Top, Right → maps to Bottom when the anchor is vertical. Center remains center.
+
+If you see small systematic offsets, the plugin can be switched to angle-based detection (uses label angle) or adjusted to consider text origin/pivot — tell me which you prefer and I can add it.
+
 Installation
 ------------
 1. Copy the plugin folder `com_github_duddie_RefPos` into your KiCad plugins directory. Typical locations:
@@ -51,15 +70,8 @@ Notes and tips
 Development / Contributing
 --------------------------
 - The plugin is implemented in Python and intended to be run inside KiCad's Python environment (pcbnew).
-- Bug reports, pull requests and suggestions are welcome. If you publish this repository, add issues or PRs on GitHub.
+- Bug reports, pull requests and suggestions are welcome. 
 
 License
 -------
-MIT — see LICENSE (if you add one) or consider this a permissive MIT-style plugin.
-
-Contact
--------
-If you want changes or additional alignment modes (e.g. align relative to footprint bounding boxes, offset values, or align rotation), open an issue or contact the author.
-
-
-Enjoy — and let me know if you want automatic offsets or presets per footprint type.
+MIT
