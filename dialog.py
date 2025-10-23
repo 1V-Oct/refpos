@@ -104,10 +104,19 @@ class AlignDialog(wx.Dialog):
         # Position mode: Absolute or Relative
         pos_mode = self.position_selector.GetString(self.position_selector.GetSelection())
         if pos_mode == "Relative":
-            # Compute anchor offset from its footprint center
+            # Compute anchor offset from its footprint center, but take alignment mode into account
             anchor_fp_center_x = anchor_fp.GetPosition().x
             anchor_fp_center_y = anchor_fp.GetPosition().y
-            anchor_offset_x = anchor_ref_center_x - anchor_fp_center_x
+            mode = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
+            if mode == "Left":
+                anchor_ref_left_x = anchor_ref_center_x - (anchor_ref_bbox.GetWidth() / 2)
+                anchor_offset_x = anchor_ref_left_x - anchor_fp_center_x
+            elif mode == "Center":
+                anchor_offset_x = anchor_ref_center_x - anchor_fp_center_x
+            else:  # Right
+                anchor_ref_right_x = anchor_ref_center_x + (anchor_ref_bbox.GetWidth() / 2)
+                anchor_offset_x = anchor_ref_right_x - anchor_fp_center_x
+
             anchor_offset_y = anchor_ref_pos.y - anchor_fp_center_y
 
         # Move other references
@@ -118,10 +127,19 @@ class AlignDialog(wx.Dialog):
                 continue  # Skip if footprint has no reference
 
             if pos_mode == "Relative":
-                # Place the label center at footprint center + anchor offset
+                # Place the label according to footprint center + anchor offset, considering alignment
                 fp_center_x = fp.GetPosition().x
                 fp_center_y = fp.GetPosition().y
-                new_x = fp_center_x + anchor_offset_x
+                ref_bbox = ref_to_move.GetBoundingBox()
+                if mode == "Left":
+                    target_left_x = fp_center_x + anchor_offset_x
+                    new_x = target_left_x + (ref_bbox.GetWidth() / 2)
+                elif mode == "Center":
+                    new_x = fp_center_x + anchor_offset_x
+                else:  # Right
+                    target_right_x = fp_center_x + anchor_offset_x
+                    new_x = target_right_x - (ref_bbox.GetWidth() / 2)
+
                 new_y = fp_center_y + anchor_offset_y
             else:
                 # Horizontal: compute X based on selected alignment mode
@@ -187,7 +205,16 @@ class AlignDialog(wx.Dialog):
         if pos_mode_val == "Relative":
             anchor_fp_center_x = anchor_fp.GetPosition().x
             anchor_fp_center_y = anchor_fp.GetPosition().y
-            anchor_offset_x = anchor_val_center_x - anchor_fp_center_x
+            mode_val = self.alignment_selector.GetString(self.alignment_selector.GetSelection())
+            if mode_val == "Left":
+                anchor_val_left_x = anchor_val_center_x - (anchor_val_bbox.GetWidth() / 2)
+                anchor_offset_x = anchor_val_left_x - anchor_fp_center_x
+            elif mode_val == "Center":
+                anchor_offset_x = anchor_val_center_x - anchor_fp_center_x
+            else:
+                anchor_val_right_x = anchor_val_center_x + (anchor_val_bbox.GetWidth() / 2)
+                anchor_offset_x = anchor_val_right_x - anchor_fp_center_x
+
             anchor_offset_y = anchor_val_pos.y - anchor_fp_center_y
 
         # Move other values
@@ -200,7 +227,16 @@ class AlignDialog(wx.Dialog):
             if pos_mode_val == "Relative":
                 fp_center_x = fp.GetPosition().x
                 fp_center_y = fp.GetPosition().y
-                new_x = fp_center_x + anchor_offset_x
+                val_bbox = val_to_move.GetBoundingBox()
+                if mode_val == "Left":
+                    target_left_x = fp_center_x + anchor_offset_x
+                    new_x = target_left_x + (val_bbox.GetWidth() / 2)
+                elif mode_val == "Center":
+                    new_x = fp_center_x + anchor_offset_x
+                else:
+                    target_right_x = fp_center_x + anchor_offset_x
+                    new_x = target_right_x - (val_bbox.GetWidth() / 2)
+
                 new_y = fp_center_y + anchor_offset_y
             else:
                 # Horizontal: compute X based on selected alignment mode
